@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QLabel, QWidget, QComboBox
 )
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtGui import QIntValidator, QPainter, QFont
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtCore import Qt
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -15,7 +15,6 @@ class Geometry3D(QOpenGLWidget):
         super().__init__()
         self.shape = shape
         self.params = params
-        print(f"[DEBUG] Geometry3D init: shape = {self.shape}, params = {self.params}")
         self.last_mouse_x = 0
         self.last_mouse_y = 0
         self.x_rot = 0
@@ -26,7 +25,6 @@ class Geometry3D(QOpenGLWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def initializeGL(self):
-        print("[DEBUG] initializeGL: Inicializando OpenGL")
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_CULL_FACE)
         glEnable(GL_LIGHTING)
@@ -37,7 +35,6 @@ class Geometry3D(QOpenGLWidget):
         glLightfv(GL_LIGHT0, GL_DIFFUSE, [1, 1, 1, 1])
 
     def resizeGL(self, w, h):
-        print(f"[DEBUG] resizeGL: width = {w}, height = {h}")
         glViewport(0, 0, w, h)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
@@ -45,7 +42,6 @@ class Geometry3D(QOpenGLWidget):
         glMatrixMode(GL_MODELVIEW)
 
     def paintGL(self):
-        print("[DEBUG] paintGL: Iniciando desenho")
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         glTranslatef(self.x_offset, self.y_offset, self.zoom)
@@ -57,23 +53,20 @@ class Geometry3D(QOpenGLWidget):
         glLineWidth(2.0)
         self.draw_shape(filled=False)
         glFlush()
-        self.draw_edge_labels()
 
     def draw_shape(self, filled):
-        print(f"[DEBUG] draw_shape: filled = {filled}, shape = {self.shape}")
         if self.shape == "paralelepípedo":
             self.draw_parallelepiped(filled)
         elif self.shape == "pirâmide":
             self.draw_pyramid(filled)
-        else:
-            print("[DEBUG] draw_shape: Forma desconhecida!")
 
     def draw_parallelepiped(self, filled):
-        print(f"[DEBUG] draw_parallelepiped: Desenhando paralelepípedo, filled = {filled}")
         w, h, d = self.params["width"], self.params["height"], self.params["depth"]
         vertices = [
-            [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2], [w/2, h/2, -d/2], [-w/2, h/2, -d/2],
-            [-w/2, -h/2, d/2], [w/2, -h/2, d/2], [w/2, h/2, d/2], [-w/2, h/2, d/2]
+            [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2],
+            [w/2, h/2, -d/2],   [-w/2, h/2, -d/2],
+            [-w/2, -h/2, d/2],  [w/2, -h/2, d/2],
+            [w/2, h/2, d/2],    [-w/2, h/2, d/2]
         ]
         edges = [
             (0, 1), (1, 2), (2, 3), (3, 0),
@@ -87,11 +80,11 @@ class Geometry3D(QOpenGLWidget):
         glEnd()
 
     def draw_pyramid(self, filled):
-        print(f"[DEBUG] draw_pyramid: Desenhando pirâmide, filled = {filled}")
         w, h, d = self.params["width"], self.params["height"], self.params["depth"]
         vertices = [
             [-w/2, 0, -d/2], [w/2, 0, -d/2],
-            [w/2, 0, d/2], [-w/2, 0, d/2], [0, h, 0]
+            [w/2, 0, d/2],   [-w/2, 0, d/2],
+            [0, h, 0]
         ]
         glBegin(GL_LINES)
         faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)]
@@ -103,65 +96,10 @@ class Geometry3D(QOpenGLWidget):
                 glVertex3fv(vertices[vertex])
         glEnd()
 
-    def draw_edge_labels(self):
-        model = glGetDoublev(GL_MODELVIEW_MATRIX)
-        proj = glGetDoublev(GL_PROJECTION_MATRIX)
-        viewport = glGetIntegerv(GL_VIEWPORT)
-        painter = QPainter(self)
-        painter.setPen(Qt.GlobalColor.white)
-        painter.setFont(QFont("Arial", 12))
-        if self.shape == "paralelepípedo":
-            w, h, d = self.params["width"], self.params["height"], self.params["depth"]
-            vertices = [
-                (-w/2, -h/2, -d/2), (w/2, -h/2, -d/2),
-                (w/2, h/2, -d/2), (-w/2, h/2, -d/2),
-                (-w/2, -h/2, d/2), (w/2, -h/2, d/2),
-                (w/2, h/2, d/2), (-w/2, h/2, d/2)
-            ]
-            edges = [
-                (0, 1, str(w)), (1, 2, str(h)),
-                (2, 3, str(w)), (3, 0, str(h)),
-                (4, 5, str(w)), (5, 6, str(h)),
-                (6, 7, str(w)), (7, 4, str(h)),
-                (0, 4, str(d)), (1, 5, str(d)),
-                (2, 6, str(d)), (3, 7, str(d))
-            ]
-        elif self.shape == "pirâmide":
-            w, h, d = self.params["width"], self.params["height"], self.params["depth"]
-            vertices = [
-                (-w/2, 0, -d/2), (w/2, 0, -d/2),
-                (w/2, 0, d/2), (-w/2, 0, d/2),
-                (0, h, 0)
-            ]
-            edges = [
-                (0, 1, str(w)), (1, 2, str(d)),
-                (2, 3, str(w)), (3, 0, str(d))
-            ]
-            lateral_length = math.sqrt((w/2)**2 + h**2 + (d/2)**2)
-            lateral_str = f"{lateral_length:.2f}"
-            edges.extend([
-                (0, 4, lateral_str), (1, 4, lateral_str),
-                (2, 4, lateral_str), (3, 4, lateral_str)
-            ])
-        else:
-            painter.end()
-            return
-        for edge in edges:
-            i, j, label = edge
-            v1 = vertices[i]
-            v2 = vertices[j]
-            mid = ((v1[0] + v2[0]) / 2, (v1[1] + v2[1]) / 2, (v1[2] + v2[2]) / 2)
-            win = gluProject(mid[0], mid[1], mid[2], model, proj, viewport)
-            if win is not None:
-                winX, winY, winZ = win
-                qt_y = viewport[3] - winY
-                painter.drawText(int(winX), int(qt_y), label)
-        painter.end()
-
     def mousePressEvent(self, event):
         self.last_mouse_x = event.position().x()
         self.last_mouse_y = event.position().y()
-        print(f"[DEBUG] mousePressEvent: x = {self.last_mouse_x}, y = {self.last_mouse_y}")
+        self.update()
 
     def mouseMoveEvent(self, event):
         dx = event.position().x() - self.last_mouse_x
@@ -170,28 +108,22 @@ class Geometry3D(QOpenGLWidget):
         self.y_rot += dx
         self.last_mouse_x = event.position().x()
         self.last_mouse_y = event.position().y()
-        print(f"[DEBUG] mouseMoveEvent: dx = {dx}, dy = {dy}, x_rot = {self.x_rot}, y_rot = {self.y_rot}")
         self.update()
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
         self.zoom += delta / 240.0
-        print(f"[DEBUG] wheelEvent: angleDelta = {delta}, zoom = {self.zoom}")
         self.update()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Up:
-            self.y_offset += 0.1
-            print(f"[DEBUG] keyPressEvent: Up pressed, y_offset = {self.y_offset}")
-        elif event.key() == Qt.Key_Down:
+        if event.key() == Qt.Key.Key_Up:
             self.y_offset -= 0.1
-            print(f"[DEBUG] keyPressEvent: Down pressed, y_offset = {self.y_offset}")
-        elif event.key() == Qt.Key_Left:
-            self.x_offset -= 0.1
-            print(f"[DEBUG] keyPressEvent: Left pressed, x_offset = {self.x_offset}")
-        elif event.key() == Qt.Key_Right:
+        elif event.key() == Qt.Key.Key_Down:
+            self.y_offset += 0.1
+        elif event.key() == Qt.Key.Key_Left:
             self.x_offset += 0.1
-            print(f"[DEBUG] keyPressEvent: Right pressed, x_offset = {self.x_offset}")
+        elif event.key() == Qt.Key.Key_Right:
+            self.x_offset -= 0.1
         self.update()
 
 class View3D(QMainWindow):
@@ -208,10 +140,8 @@ class View3D(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-        print(f"[DEBUG] View3D: Abrindo visualização para '{shape}' com parâmetros {params}")
 
     def go_back(self):
-        print("[DEBUG] go_back: Retornando à tela principal")
         self.main_app = MainApp()
         self.main_app.show()
         self.close()
@@ -245,7 +175,6 @@ class MainApp(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
         self.confirm_button.clicked.connect(self.open_3d_view)
-        print("[DEBUG] MainApp: Interface inicializada")
 
     def open_3d_view(self):
         shape = self.shape_selector.currentText().lower()
@@ -254,13 +183,12 @@ class MainApp(QMainWindow):
             "height": int(self.input_height.text()),
             "depth": int(self.input_depth.text())
         }
-        print(f"[DEBUG] open_3d_view: shape = {shape}, params = {params}")
         self.view3d = View3D(shape, params)
         self.view3d.show()
         self.close()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainApp()
+    window = MainApp()  
     window.show()
     sys.exit(app.exec())

@@ -1,5 +1,4 @@
 import sys
-import math
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton,
     QLineEdit, QLabel, QWidget, QComboBox
@@ -10,10 +9,15 @@ from PyQt6.QtCore import Qt
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+
 class Geometry3D(QOpenGLWidget):
-    def __init__(self, shape, params):
+    """
+    Widget OpenGL para renderização de formas 3D.
+    Suporta as formas "parallelepiped" (paralelepípedo) e "pyramid" (pirâmide).
+    """
+    def __init__(self, shape: str, params: dict):
         super().__init__()
-        self.shape = shape
+        self.shape = shape  # forma interna: "parallelepiped" ou "pyramid"
         self.params = params
         self.last_mouse_x = 0
         self.last_mouse_y = 0
@@ -23,6 +27,43 @@ class Geometry3D(QOpenGLWidget):
         self.x_offset = 0.0
         self.y_offset = 0.0
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        # Pré-computa os vértices e dados geométricos da forma
+        self.shape_data = self.compute_shape_data()
+
+    def compute_shape_data(self) -> dict:
+        """
+        Calcula os vértices e arestas ou faces da forma, de acordo com os parâmetros.
+        Retorna um dicionário com os dados necessários para o desenho.
+        """
+        if self.shape == "parallelepiped":
+            w, h, d = self.params["width"], self.params["height"], self.params["depth"]
+            vertices = [
+                [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2],
+                [w/2, h/2, -d/2],   [-w/2, h/2, -d/2],
+                [-w/2, -h/2, d/2],  [w/2, -h/2, d/2],
+                [w/2, h/2, d/2],    [-w/2, h/2, d/2]
+            ]
+            edges = [
+                (0, 1), (1, 2), (2, 3), (3, 0),
+                (4, 5), (5, 6), (6, 7), (7, 4),
+                (0, 4), (1, 5), (2, 6), (3, 7)
+            ]
+            return {"vertices": vertices, "edges": edges}
+
+        elif self.shape == "pyramid":
+            w, h, d = self.params["width"], self.params["height"], self.params["depth"]
+            # Base retangular e vértice do topo
+            vertices = [
+                [-w/2, 0, -d/2], [w/2, 0, -d/2],
+                [w/2, 0, d/2],   [-w/2, 0, d/2],
+                [0, h, 0]
+            ]
+            # Faces laterais (triângulos) e aresta da base
+            faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)]
+            base_edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+            return {"vertices": vertices, "faces": faces, "base_edges": base_edges}
+        else:
+            return {}
 
     def initializeGL(self):
         glEnable(GL_DEPTH_TEST)
@@ -34,11 +75,11 @@ class Geometry3D(QOpenGLWidget):
         glLightfv(GL_LIGHT0, GL_POSITION, [5, 5, 5, 1])
         glLightfv(GL_LIGHT0, GL_DIFFUSE, [1, 1, 1, 1])
 
-    def resizeGL(self, w, h):
+    def resizeGL(self, w: int, h: int):
         glViewport(0, 0, w, h)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(45, w / h if h else 1, 1, 50)
+        gluPerspective(45, w / h if h != 0 else 1, 1, 50)
         glMatrixMode(GL_MODELVIEW)
 
     def paintGL(self):
@@ -47,54 +88,48 @@ class Geometry3D(QOpenGLWidget):
         glTranslatef(self.x_offset, self.y_offset, self.zoom)
         glRotatef(self.x_rot, 1.0, 0.0, 0.0)
         glRotatef(self.y_rot, 0.0, 1.0, 0.0)
+        # Exibe o modelo em wireframe
         glDisable(GL_CULL_FACE)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glColor3f(1.0, 1.0, 1.0)
         glLineWidth(2.0)
-        self.draw_shape(filled=False)
+        self.draw_shape()
         glFlush()
 
-    def draw_shape(self, filled):
-        if self.shape == "paralelepípedo":
-            self.draw_parallelepiped(filled)
-        elif self.shape == "pirâmide":
-            self.draw_pyramid(filled)
+    def draw_shape(self):
+        """Seleciona e desenha a forma com base nos dados pré-computados."""
+        if self.shape == "parallelepiped":
+            self.draw_parallelepiped()
+        elif self.shape == "pyramid":
+            self.draw_pyramid()
 
-    def draw_parallelepiped(self, filled):
-        w, h, d = self.params["width"], self.params["height"], self.params["depth"]
-        vertices = [
-            [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2],
-            [w/2, h/2, -d/2],   [-w/2, h/2, -d/2],
-            [-w/2, -h/2, d/2],  [w/2, -h/2, d/2],
-            [w/2, h/2, d/2],    [-w/2, h/2, d/2]
-        ]
-        edges = [
-            (0, 1), (1, 2), (2, 3), (3, 0),
-            (4, 5), (5, 6), (6, 7), (7, 4),
-            (0, 4), (1, 5), (2, 6), (3, 7)
-        ]
+    def draw_parallelepiped(self):
+        """Desenha um paralelepípedo a partir dos vértices e arestas calculados."""
+        vertices = self.shape_data.get("vertices", [])
+        edges = self.shape_data.get("edges", [])
         glBegin(GL_LINES)
         for edge in edges:
             glVertex3fv(vertices[edge[0]])
             glVertex3fv(vertices[edge[1]])
         glEnd()
 
-    def draw_pyramid(self, filled):
-        w, h, d = self.params["width"], self.params["height"], self.params["depth"]
-        vertices = [
-            [-w/2, 0, -d/2], [w/2, 0, -d/2],
-            [w/2, 0, d/2],   [-w/2, 0, d/2],
-            [0, h, 0]
-        ]
+    def draw_pyramid(self):
+        """Desenha uma pirâmide com linhas: as faces laterais e a base."""
+        vertices = self.shape_data.get("vertices", [])
+        faces = self.shape_data.get("faces", [])
+        base_edges = self.shape_data.get("base_edges", [])
         glBegin(GL_LINES)
-        faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)]
+        # Desenha as faces laterais
         for face in faces:
             for vertex in face:
                 glVertex3fv(vertices[vertex])
-        for edge in [(0, 1), (1, 2), (2, 3), (3, 0)]:
-            for vertex in edge:
-                glVertex3fv(vertices[vertex])
+        # Desenha as arestas da base
+        for edge in base_edges:
+            glVertex3fv(vertices[edge[0]])
+            glVertex3fv(vertices[edge[1]])
         glEnd()
+
+    # Eventos de entrada
 
     def mousePressEvent(self, event):
         self.last_mouse_x = event.position().x()
@@ -126,8 +161,13 @@ class Geometry3D(QOpenGLWidget):
             self.x_offset -= 0.1
         self.update()
 
+
 class View3D(QMainWindow):
-    def __init__(self, shape, params):
+    """
+    Janela para exibição da forma 3D.
+    Contém o widget OpenGL e um botão para voltar.
+    """
+    def __init__(self, shape: str, params: dict):
         super().__init__()
         self.setWindowTitle("Visualização 3D")
         self.setGeometry(100, 100, 800, 600)
@@ -142,16 +182,23 @@ class View3D(QMainWindow):
         self.setCentralWidget(container)
 
     def go_back(self):
+        """Retorna para a tela de configuração."""
         self.main_app = MainApp()
         self.main_app.show()
         self.close()
 
+
 class MainApp(QMainWindow):
+    """
+    Janela principal para configuração dos parâmetros da forma.
+    Permite escolher a forma e definir os valores de largura, altura e profundidade.
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Configuração da Forma")
         self.setGeometry(100, 100, 400, 300)
         self.shape_selector = QComboBox()
+        # Exibe os nomes em português para o usuário
         self.shape_selector.addItems(["Paralelepípedo", "Pirâmide"])
         self.input_width = QLineEdit("2")
         self.input_height = QLineEdit("3")
@@ -161,6 +208,7 @@ class MainApp(QMainWindow):
         self.input_height.setValidator(validator)
         self.input_depth.setValidator(validator)
         self.confirm_button = QPushButton("Visualizar")
+
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Largura:"))
         layout.addWidget(self.input_width)
@@ -177,7 +225,14 @@ class MainApp(QMainWindow):
         self.confirm_button.clicked.connect(self.open_3d_view)
 
     def open_3d_view(self):
-        shape = self.shape_selector.currentText().lower()
+        """Coleta os parâmetros informados e abre a visualização 3D."""
+        # Mapeia o nome da forma para a chave interna utilizada
+        shape_mapping = {
+            "paralelepípedo": "parallelepiped",
+            "pirâmide": "pyramid"
+        }
+        selected = self.shape_selector.currentText().strip().lower()
+        shape = shape_mapping.get(selected, selected)
         params = {
             "width": int(self.input_width.text()),
             "height": int(self.input_height.text()),
@@ -187,8 +242,9 @@ class MainApp(QMainWindow):
         self.view3d.show()
         self.close()
 
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainApp()  
+    window = MainApp()
     window.show()
     sys.exit(app.exec())

@@ -6,7 +6,6 @@ class GeometryCalculator:
         if value == int(value):
             return str(int(value))
         formatted = f"{value:.4f}"
-        # Remove zeros finais e ponto, se necessário
         formatted = formatted.rstrip('0').rstrip('.') if '.' in formatted else formatted
         return formatted
 

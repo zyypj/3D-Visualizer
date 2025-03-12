@@ -5,6 +5,9 @@ on:
     branches:
       - '**'
 
+permissions:
+  contents: write
+
 jobs:
   build_release:
     runs-on: windows-latest

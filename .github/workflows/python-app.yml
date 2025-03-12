@@ -31,6 +31,30 @@ jobs:
         pyinstaller --onefile --windowed main.py
       shell: cmd
 
+    - name: Delete previous release if exists
+      shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_REF: ${{ github.ref }}
+      run: |
+        # Remove "refs/tags/" para obter a tag apenas
+        $tag = $env:GITHUB_REF -replace 'refs/tags/', ''
+        Write-Host "Tag: $tag"
+        try {
+          # Tenta obter o release pela tag
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" -Headers @{Authorization = "token $env:GITHUB_TOKEN"} -Method Get
+          if ($release -and $release.id) {
+            Write-Host "Deleting release with id $($release.id)"
+            # Apaga o release
+            Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($release.id)" -Headers @{Authorization = "token $env:GITHUB_TOKEN"} -Method Delete
+          }
+        }
+        catch {
+          Write-Host "No existing release found for tag $tag"
+        }
+
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1

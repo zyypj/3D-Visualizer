@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView
 from PyQt6.QtCore import pyqtSignal
 from geometry_calculator import GeometryCalculator
+import math
 
 class GeometryInfoTab(QWidget):
     face_selected = pyqtSignal(str)
@@ -19,9 +20,10 @@ class GeometryInfoTab(QWidget):
         layout.addWidget(header)
         self.volume_label = QLabel()
         layout.addWidget(self.volume_label)
-        # Rótulo para Altura (apenas exibido se a forma for pirâmide)
         self.height_label = QLabel()
         layout.addWidget(self.height_label)
+        self.generatriz_label = QLabel()
+        layout.addWidget(self.generatriz_label)
         self.total_area_label = QLabel()
         layout.addWidget(self.total_area_label)
         layout.addWidget(QLabel("<h4>Áreas das Faces</h4>"))
@@ -38,18 +40,28 @@ class GeometryInfoTab(QWidget):
         instructions.setStyleSheet("color: #666; font-style: italic;")
         layout.addWidget(instructions)
         self.setLayout(layout)
+
     
     def update_calculations(self):
         if self.shape == "parallelepiped":
             properties = self.calculator.calculate_parallelepiped_properties(self.params)
-            self.height_label.setText("")  # Sem exibir altura para paralelepípedo
+            self.height_label.setText("")  # Não exibe altura para paralelepípedo
+            self.generatriz_label.setText("")  # Sem geratriz para paralelepípedo
         elif self.shape == "pyramid":
             properties = self.calculator.calculate_pyramid_properties(self.params)
             height_val = self.params.get("height", 0)
             self.height_label.setText(f"<b>Altura:</b> {self.calculator.format_value(height_val)} unidades")
+            geratriz_front = properties.get("geratriz_front_back", 0)
+            geratriz_side = properties.get("geratriz_left_right", 0)
+            # Se as duas geratrizes forem iguais (pirâmide quadrada), exibe uma única geratriz.
+            if math.isclose(geratriz_front, geratriz_side, rel_tol=1e-9):
+                self.generatriz_label.setText(f"<b>Geratriz:</b> {self.calculator.format_value(geratriz_front)} unidades")
+            else:
+                self.generatriz_label.setText(f"<b>Geratriz Frente/Trás:</b> {self.calculator.format_value(geratriz_front)} unidades, "
+                                            f"<b>Geratriz Lados:</b> {self.calculator.format_value(geratriz_side)} unidades")
         else:
             return
-        
+
         volume = self.calculator.format_value(properties["volume"])
         total_area = self.calculator.format_value(properties["total_area"])
         self.volume_label.setText(f"<b>Volume:</b> {volume} unidades³")
@@ -78,6 +90,7 @@ class GeometryInfoTab(QWidget):
             area_item = QTableWidgetItem(self.calculator.format_value(face_area) + " unidades²")
             self.face_table.setItem(i, 0, face_item)
             self.face_table.setItem(i, 1, area_item)
+
     
     def on_face_selected(self, row, column):
         face_name = self.face_table.item(row, 0).text()

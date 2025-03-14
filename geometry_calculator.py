@@ -47,12 +47,13 @@ class GeometryCalculator:
         base_area = width * depth
         volume = (1/3) * base_area * height
         base_face_area = base_area
-        half_width_center = width / 2
-        half_depth_center = depth / 2
-        front_back_triangle_height = math.sqrt(height**2 + half_depth_center**2)
-        left_right_triangle_height = math.sqrt(height**2 + half_width_center**2)
-        front_back_face_area = (width * front_back_triangle_height) / 2
-        left_right_face_area = (depth * left_right_triangle_height) / 2
+        half_width = width / 2
+        half_depth = depth / 2
+        # Calcula as geratrizes para os lados diferentes:
+        generatriz_front_back = math.sqrt(height**2 + half_depth**2)
+        generatriz_left_right = math.sqrt(height**2 + half_width**2)
+        front_back_face_area = (width * generatriz_front_back) / 2
+        left_right_face_area = (depth * generatriz_left_right) / 2
         total_area = base_face_area + 2 * front_back_face_area + 2 * left_right_face_area
         face_areas = {
             "Base": base_face_area,
@@ -66,11 +67,12 @@ class GeometryCalculator:
             "Frente/Trás": front_back_face_area,
             "Esquerda/Direita": left_right_face_area
         }
-        # Adiciona a altura como propriedade para exibição
         return {
             "volume": volume,
             "faces": faces,
             "face_areas": face_areas,
             "total_area": total_area,
-            "height": height
+            "height": height,
+            "geratriz_front_back": generatriz_front_back,
+            "geratriz_left_right": generatriz_left_right
         }
